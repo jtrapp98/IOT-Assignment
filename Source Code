@@ -1,0 +1,78 @@
+
+//Included libraries 
+#include <WiFiNINA.h>
+#include <ThingSpeak.h>
+#include <WiFi.h>
+
+char ssid[] = "cs";
+char password[] = "gkmrxuW6";
+
+int piezoPin = 7;
+int tempPin = A1;
+int airThres = 5;
+int Analog_Input = A0;
+int reading = 0;
+
+float celsius = 0;
+float sensor_volt;  
+float sensorValue; 
+
+const unsigned long channel_id = 921806;
+const char write_api_key[] = "WKRS7LH55TMSBEBF";
+
+WiFiClient client;
+void setup(){
+  
+  Serial.begin(9600);
+
+  Serial.print("Connecting to ");
+  Serial.print(ssid);
+  WiFi.begin(ssid, password);
+  while (WiFi.status() != WL_CONNECTED){
+    delay(500);
+    Serial.println(".");
+  }
+  Serial.println();
+  Serial.println("Connected!");
+  ThingSpeak.begin(client);
+
+  Serial.println("Gas sensor warming up");
+  delay(20000);
+  Serial.println("Gas ready");
+
+}
+
+  void loop(){  
+    Serial.println();
+
+// This section is responsible for detecing the temperature
+    reading = analogRead(tempPin);  
+    float voltage = reading * 5.0;
+    voltage /= 1024.0; 
+    float celsius = (voltage - 0.5) * 100 ;  //converting from 10 mv per degree with 500 mV offset                                           //to degrees ((voltage - 500mV) times 100)
+    Serial.print(celsius); Serial.println(" degrees C");
+
+    //This section of code is responsible for detecing the Gas levels
+    float Airsensor = analogRead(Analog_Input);
+    Serial.println("Gas Measurement (V): " + String(Airsensor,2)+ "/" + airThres); //The higher the gas concentration the higher the output voltage
+
+  // Sends the data gathered by the sensors to ThingSpeak
+    ThingSpeak.setField(1, String(celsius,2 ));
+    ThingSpeak.setField(2, String(Airsensor));
+    ThingSpeak.writeFields(channel_id, write_api_key);
+
+    if (celsius > 35) {       //Triggers buzzer if temperature reading goes over a set value, value can be lowered to simulate high temperature without the need for fire
+      tone(piezoPin, 100);
+      Serial.print(" | high temperature detected!");
+      }
+      else noTone(piezoPin);
+
+    if (Airsensor > airThres) {    //Triggers buzzer and warning message if gas concentration reading goes over a set value
+      tone(piezoPin, 100);
+      Serial.print(" | smoke detected!");
+     }
+     else noTone(piezoPin);
+  
+    delay(2000);
+  }
+
